@@ -4,6 +4,10 @@ import numpy as np
 import json
 import torch
 import model
+from tqdm import tqdm
+
+from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
 
 def process(files) -> list:
     detections = []
@@ -111,7 +115,71 @@ def format_data(data:dict) -> list:
     return final_data
 
 
-def trainModel(model: model.GRUModel, epochs:int=5, validate=False):
-    pass
+def trainModel(model: model.GRUModel, optim:Adam, crit:CrossEntropyLoss, train_loader, valid_loader,  epochs:int=5, validate=False):
+    model.train()
+
+    for i in range(epochs):
+        running_loss = 0.
+        for videos in tqdm(train_loader, desc=f"Training {i+1}/{epochs} epoch"):
+            optim.zero_grad()
+            X = videos[0]
+            y = videos[1]
+
+            out = model(X)
+            y = y.long()
+            loss = crit(out[:, -1, :], y)
+            loss.backward()
+            # Monitorting Gradients
+            total_norm = 0
+            for param in model.parameters():
+                if param.grad is not None:
+                    param_norm = param.grad.norm(2).item()
+                    total_norm += param_norm ** 2
+            total_norm = total_norm ** 0.5
+            # print(f"Gradient Norm: {total_norm}")
+            optim.step()
+            running_loss += loss.item() / y.size(0)
+
+        print(f'running loss: {running_loss}; Gradient Norm: {total_norm};epoch: {i+1}')
+
+
+
+
+
+
+# def trainModel(model:Classifier, epochs:int, validate=False):
+#     model.train()
+#     running_loss = 0.
+#     for i in range(epochs):
+#         for images, labels in tqdm(train_loader, desc= f'Training {i + 1}/{epochs} epoch'):
+#             optim.zero_grad()
+#             output = model(images)
+#             loss = crit(output, labels)
+#             loss.backward()
+#             optim.step()
+#             running_loss += loss.item() / labels.size(0)
+#         print(f'running loss: {running_loss} epoch; {i + 1}')
+
+#         if validate:
+#             model.eval()
+#             running_loss = 0.
+#             with torch.no_grad():
+#                 for images, labels in tqdm(valid_loader, desc= f'Validation {i + 1}/{epochs} epoch'):
+#                     output = model(images)
+#                     loss = crit(output, labels)
+#                     running_loss += loss.item() / labels.size(0)
+#                 print(f'running loss: {running_loss} epoch; {i + 1}')
+
+# def testModel(model:Classifier):
+#     model.eval()
+#     running_loss = 0
+#     with torch.no_grad():
+#         for images, labels in tqdm(test_loader, desc=f'Testing:'):
+#             output = model(images)
+#             loss = crit(output, labels)
+#             running_loss += loss.item() / labels.size(0)
+
+#         print(f'Running Loss: {running_loss} \n Average Loss Per Batch: {running_loss/test_loader.__len__()}')
+
 
 
